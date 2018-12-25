@@ -54,20 +54,27 @@ class RobotCommandToRigidBodyPlantConverter(LeafSystem):
                                                                          self.OutputActuation).get_index()
 
     def OutputActuation(self, context, output):
+        """
+
+        :type output: object
+        """
         ## OutputDesiredEffort is not equal to output command
         msg = self.EvalAbstractInput(context, self.robot_command_port_index).get_value()
-
+        #print('t = {}  command = {}'.format(msg.timestamp, msg.joint_command))
         # TODO : Considering motor model (motor effort length etc.)
         command = msg.joint_command
-
-        if len(command) == 0 :
-            output_command =  self.actuators_init
-        elif len(command) == self.num_actuators:
-            output_command = self.actuators_init + np.array(command)
+        num_actuators = msg.num_joints
+        if num_actuators != 0 :
+           # print(command)
+            if num_actuators == self.num_actuators:
+                output_command = self.actuators_init + np.array(command)
+                output.SetFromVector(output_command)
+            else:
+                assert("Command size ( {} )doesn't match the size of actuators".format(len(command)))
         else:
-            raise("Command size doesn't match the size of actuators")
+            output_command = self.actuators_init
 
-        output.SetFromVector(output_command)
+            output.SetFromVector(output_command)
 
     def robot_command_input_port(self):
         return self.get_input_port(self.robot_command_port_index)

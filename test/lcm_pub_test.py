@@ -1,5 +1,3 @@
-from pydrake.common import FindResourceOrThrow
-from pydrake.geometry import (ConnectDrakeVisualizer, SceneGraph)
 from pydrake.lcm import DrakeLcm
 from pydrake.multibody.rigid_body_tree import (RigidBodyTree, AddModelInstancesFromSdfFile,
                                                FloatingBaseType, AddModelInstanceFromUrdfFile, AddFlatTerrainToWorld,
@@ -24,14 +22,14 @@ import os
 import pydrake
 
 from pydrake.systems.all import LcmSubscriberSystem, LcmPublisherSystem, AbstractValue
-from pydrake.multibody.rigid_body_plant import ContactResults
-from pydrake.all import PySerializer
-# from pydrake.all import  KinematicsResults
+
 
 from lcmt import *
+model_path = os.path.join(os.getcwd(), 'Model/LittleDog.urdf')
 
+dt = 0
 
-class RobotStateEncoder(LeafSystem):
+class RobotStateOutput(LeafSystem):
     """
     A block system that outputs all state infomation to a lcm publisher.
 
@@ -44,19 +42,9 @@ class RobotStateEncoder(LeafSystem):
         -- lcm_message_port : AbstractValue, lcm publisher type
 
     """
-    def __init__(self, rb_tree):
+    def __init__(self ):
         LeafSystem.__init__(self)
-        self.rb_tree = rb_tree
-        self.num_position = self.rb_tree.get_num_positions()
-        self.num_controlled_q_ = self.rb_tree.get_num_actuators()
 
-
-        # Input Port
-        self.joint_state_results_port_index = self._DeclareInputPort('joint_state_results_port',
-                                                                     PortDataType.kVectorValued,
-                                                                     self.num_position * 2).get_index()
-        #         self.contact_results_port_index = self._DeclareAbstractInputPort('contact_results_port',
-        #                                                                        AbstractValue.Make(ContactResults)).get_index()
         # Output Port
         self.lcm_message_port_index = self._DeclareAbstractOutputPort('state_output_port',
                                                                       self._Allocator,
@@ -69,19 +57,74 @@ class RobotStateEncoder(LeafSystem):
         message = robot_state_t()
         message.timestamp = context.get_time() * 1e3  # milliseconds
 
-        # contact_result = EvalAbstractInput(context, contact_results_port_index).get_value()
-        joint_state_result = self.EvalVectorInput(context, self.joint_state_results_port_index).get_value()
-
         # get all information
-        message.num_joints = self.num_controlled_q_
-        message.joint_position = joint_state_result[self.num_position - self.num_controlled_q_:self.num_position]
-        message.joint_velocity = joint_state_result[self.num_position *2 - self.num_controlled_q_:]
+        message.num_joints = 13
+        message.joint_position = np.ones(13)* 1.5
+        message.joint_velocity = np.ones(13)* 0.5
 
-        print('t = {}  joint_pos = {}'.format(message.timestamp, message.joint_position))
+        #print('t = {}  joint_pos = {}'.format(message.timestamp, message.joint_position))
        # print(message.joint_position.shape)
         output.set_value(message)
 
-    def joint_state_results_input_port(self):
-        return self.get_input_port(self.joint_state_results_port_index)
+
     def lcm_message_output_port(self):
         return self.get_output_port(self.lcm_message_port_index)
+
+
+# dut = mut.LcmPublisherSystem.Make(
+#     channel="EST_ROBOT_STATE", lcm_type=robot_state_t, lcm=lcm)
+
+lcm = DrakeLcm()
+builder = DiagramBuilder()
+
+
+# Robot State Publisher
+robot_state_publisher = builder.AddSystem(LcmPublisherSystem.Make('EST_ROBOT_STATE', robot_state_t, lcm))
+robot_state_publisher.set_name('robot_state_publisher')
+robot_state_publisher.set_publish_period(1e-3)
+
+
+# Robot State Encoder
+robot_state_output = builder.AddSystem(RobotStateOutput())  # force_sensor_info
+robot_state_output.set_name('robot_state_output')
+
+builder.Connect(robot_state_output.lcm_message_output_port(),
+                    robot_state_publisher.get_input_port(0))
+
+
+diagram = builder.Build()
+
+
+# while(True):
+#     pub_context = diagram.GetMutableSubsystemContext(robot_state_publisher, diagram_context)
+#     robot_state_publisher.Publish(pub_context)
+
+# simulation setting
+diagram_context = diagram.CreateDefaultContext()
+simulator = Simulator(diagram, diagram_context)
+simulator.set_publish_every_time_step(False)
+simulator.set_target_realtime_rate(1)
+simulator.Initialize()
+
+simulation_time = 10
+
+lcm.StartReceiveThread()
+simulator.StepTo(simulation_time)
+lcm.StopReceiveThread()
+
+
+#
+# context = dut.CreateDefaultContext()
+# message = robot_state_t()
+# message.timestamp = context.get_time() * 1e3
+# message.num_joints = 5
+# message.joint_position = np.ones(5)
+# message.joint_velocity = np.ones(5)*0.2
+#
+# context.FixInputPort(0, AbstractValue.Make(message))
+#
+# while True:
+#     message.timestamp = context.get_time() * 1e3
+#     print(message.timestamp)
+#     dut.Publish(context)
+
