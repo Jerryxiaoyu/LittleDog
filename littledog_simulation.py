@@ -12,12 +12,17 @@ from systems.littledog_whole_diagram import LittleDogSimulationDiagram
 from systems.setup_littledog import SetupLittleDog
 from pydrake.multibody.rigid_body_plant import DrakeVisualizer
 from systems.setup_kinova import SetupKinova
+
+from systems.LittleDog import LittleDog
 import time
+
+model_path = os.path.join(os.path.dirname(__file__), 'Model/LittleDog.urdf')
 
 dt = 0
 lcm = DrakeLcm()
 
-rb_tree = SetupLittleDog()
+rb_tree = LittleDog(model_path).rb_tree
+#rb_tree = SetupLittleDog()
 #rb_tree = SetupKinova()
 drake_visualizer = DrakeVisualizer(rb_tree, lcm, enable_playback= True)
 diagram, logger,plant = LittleDogSimulationDiagram(lcm, rb_tree, dt, drake_visualizer)
@@ -38,7 +43,7 @@ simulator.Initialize()
 simulator.get_mutable_integrator().set_target_accuracy(1e-3)
 
 
-simulation_time = 5
+simulation_time = 2
 
 t0 = time.time()
 lcm.StartReceiveThread()
@@ -48,22 +53,24 @@ tf = time.time()
 
 # drake_visualizer.ReplayCachedSimulation()
 # # plot graph
+
+
 # plot_system_graphviz(diagram, max_depth=2147483647)
 # plt.show()
 
-plot_system_graphviz(diagram, max_depth=2147483647)
-plt.show()
-
+logger_state = logger[0]
 print("t = ", tf-t0)
-t = logger.sample_times()
-q = logger.data()
+t = logger_state.sample_times()
+q = logger_state.data()
 
 plt.figure(figsize=(15, 10))
 for i in range(12):
     plt.subplot(4, 3, i + 1)
-    plt.plot(t, logger.data()[i, :], 'b', label='id')
+    plt.plot(t, logger_state.data()[i, :], 'b', label='id')
 
     plt.title('joint positon {}'.format(i))
     plt.legend(loc='best')
 
 plt.show()
+
+

@@ -42,6 +42,7 @@ def LittleDogSimulationDiagram(lcm,rb_tree,  dt, drake_visualizer):
 
 
     num_pos = rb_tree.get_num_positions()
+    num_actuators = rb_tree.get_num_actuators()
 
     # RigidBodyPlant
     plant = builder.AddSystem(RigidBodyPlant(rb_tree, dt))
@@ -91,8 +92,9 @@ def LittleDogSimulationDiagram(lcm,rb_tree,  dt, drake_visualizer):
                     robot_state_publisher.get_input_port(0))
 
     # Signal logger
-    logger = builder.AddSystem(SignalLogger(num_pos*2))
-    builder.Connect(plant.state_output_port(), logger.get_input_port(0))
+    logger  = builder.AddSystem(SignalLogger(num_pos*2))
+    builder.Connect(plant.state_output_port(), logger .get_input_port(0))
+
 
 
     return builder.Build(), logger,plant

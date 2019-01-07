@@ -15,7 +15,7 @@ from pydrake.systems.primitives import (ConstantVectorSource, SignalLogger, Traj
 from pydrake.systems.meshcat_visualizer import MeshcatVisualizer
 from pydrake.multibody.parsers import PackageMap
 from pydrake.systems.framework import LeafSystem, PortDataType, BasicVector
-
+from pydrake.multibody.parsing import Parser
 from pydrake.multibody.rigid_body_plant import DrakeVisualizer, RigidBodyPlant
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,7 +35,7 @@ from util.meshcat_rigid_body_visualizer import MeshcatRigidBodyVisualizer
 from controllers.PID_controller import joints_PID_params, RobotPDAndFeedForwardController
 from robot_command_to_plant_converter import RobotCommandToRigidBodyPlantConverter
 from robot_state_encoder import RobotStateEncoder
-from pydrake.multibody.parsing import Parser
+from robot_state_handle import RobotStateHandle
 
 model_path = os.path.join(os.path.dirname(__file__), '../Model/LittleDog.urdf')
 #model_path = os.path.join(pydrake.getDrakePath(), 'manipulation/models/jaco_description/urdf/j2n6s300.urdf')
@@ -52,10 +52,10 @@ def LittleDogSimulationDiagram(lcm, rb_tree,  dt, drake_visualizer):
     zero_config = np.zeros((rb_tree.get_num_actuators() *2 , 1))   # just for test
     #zero_config =  np.concatenate((np.array([0, 1, 1, 1,   1.7, 0.5, 0, 0, 0]),np.zeros(9)), axis=0)
     #zero_config = np.concatenate((rb_tree.getZeroConfiguration(),np.zeros(9)), axis=0)
-    zero_config = np.concatenate((np.array([ 1,  0, 0,
-                                            0, 0, 0,
-                                            0, 0, 0,
-                                            0, 0,  0]), np.zeros(12)), axis=0)
+    zero_config = np.concatenate((np.array([0.5,  0.5, 0.5,
+                                            0.5, 0.5, 0.5,
+                                            0.5, 0.5, 0.5,
+                                            0.5, 0.5,  0.5]), np.zeros(12)), axis=0)
     # zero_config[0] = 1.7
     # zero_config[1] = 1.7
     # zero_config[2] = 1.7
@@ -78,6 +78,8 @@ def LittleDogSimulationDiagram(lcm, rb_tree,  dt, drake_visualizer):
 
     builder.Connect(plant.state_output_port(),
                     robot_state_encoder.joint_state_results_input_port())
+
+
 
     # Robot command to Plant Converter
     robot_command_to_rigidbodyplant_converter = builder.AddSystem(
@@ -123,17 +125,47 @@ def LittleDogSimulationDiagram(lcm, rb_tree,  dt, drake_visualizer):
     builder.Connect(traj_src.get_output_port(0),
                     PIDcontroller.get_input_port(1))
 
+    # Robot State handle
+    robot_state_handle = builder.AddSystem(RobotStateHandle(rb_tree))  # force_sensor_info
+    robot_state_handle.set_name('robot_state_handle')
+
+    builder.Connect(plant.state_output_port(),
+                    robot_state_handle.joint_state_results_input_port())
+
+    logger_N = 4
+    logger =[]
+    for i in range(logger_N):
+        logger.append([])
 
     # Signal logger
-    signalLogRate = 60
-    logger = builder.AddSystem(SignalLogger(num_pos*2, batch_allocation_size = 1000))
-    logger._DeclarePeriodicPublish(1. / signalLogRate, 0.0)
-    builder.Connect(plant.get_output_port(0), logger.get_input_port(0))
+    signalLogRate = 100
+    logger[0] = builder.AddSystem(SignalLogger(num_pos*2 ))
+    logger[0]._DeclarePeriodicPublish(1. / signalLogRate, 0.0)
+    builder.Connect(plant.get_output_port(0), logger[0].get_input_port(0))
 
+
+    # cotroller command
+    logger[1] = builder.AddSystem(SignalLogger(num_actuators))
+    logger[1]._DeclarePeriodicPublish(1. / signalLogRate, 0.0)
+    builder.Connect(PIDcontroller.get_output_port(0), logger[1].get_input_port(0))
+
+    # torque
+
+    # other
+    logger[2] = builder.AddSystem(SignalLogger(3))
+    builder.Connect(robot_state_handle.com_outport_port(), logger[2].get_input_port(0))
+    logger[2]._DeclarePeriodicPublish(1. / signalLogRate, 0.0)
+
+    logger[3] = builder.AddSystem(SignalLogger(num_actuators))
+    builder.Connect(plant.torque_output_port(), logger[3].get_input_port(0))
+    logger[3]._DeclarePeriodicPublish(1. / signalLogRate, 0.0)
 
     return builder.Build(), logger, plant
 
 
+"""
+test for sdf , doest work!
+"""
 def LittleDogSimulationDiagram2(lcm, rb_tree, dt, drake_visualizer):
     builder = DiagramBuilder()
 
