@@ -31,7 +31,8 @@ from pydrake.all import PySerializer
 from lcmt import *
 
 
-class RobotCommandToRigidBodyPlantConverter(LeafSystem):
+
+class RobotCommandToRigidBodyPlantLCMConverter(LeafSystem):
     """
     A block system that outputs torques of joints to Robot Plant, given a Command subscriber
 
@@ -71,10 +72,61 @@ class RobotCommandToRigidBodyPlantConverter(LeafSystem):
                 assert("Command size ( {} )doesn't match the size of actuators".format(len(command)))
         else:
             output_command = self.actuators_init
-        #print('actuators = {}'.format(output_command))
+
+        #print('actuators = {}'.format(output_command[0] ))
+
+        #output_command2 = np.ones(9) * 20 #self.actuators_init
         output.SetFromVector(output_command)
+
+
 
     def robot_command_input_port(self):
         return self.get_input_port(self.robot_command_port_index)
     def desired_effort_output_port(self):
         return self.get_output_port(self.desired_effort_port_indices)
+
+
+class RobotCommandToRigidBodyPlantConverter(LeafSystem):
+    """
+    A block system that outputs torques of joints to Robot Plant, given a Command subscriber
+
+    Command subscriber  --> this block  --> Robot Plant
+
+    Input Port :
+        -- robot_command_port : AbstractValue,  lcm_subscriber type
+    Output Port:
+        -- desired_effort_port : BasicVector, numpy[n, 1] the torques of actuators
+    """
+    def __init__(self, actuators, motor_gain = None):
+        LeafSystem.__init__(self)
+        self.num_actuators = len(actuators)
+        self.actuators_init = np.ones(self.num_actuators) * 0.0
+        if motor_gain is None:
+            motor_gain = np.ones(self.num_actuators)
+
+        assert motor_gain.shape == (self.num_actuators, )
+
+        self.motor_gain = motor_gain
+        self.robot_command_port_index = self._DeclareInputPort('robot_command_port', PortDataType.kVectorValued,
+                                                        self.num_actuators  ).get_index()
+
+        self.desired_effort_port_index = self._DeclareVectorOutputPort(BasicVector(self.num_actuators),
+                                                                         self.OutputActuation).get_index()
+
+    def OutputActuation(self, context, output):
+        """
+
+        :type output: object
+        """
+        robot_command = self.EvalVectorInput(context, self.robot_command_port_index).get_value()
+
+        # TODO: ignoring Motor dynamics, and assume the gains of motor are constant
+
+        motor_torque = self.motor_gain * robot_command
+
+        output.SetFromVector(motor_torque)
+
+    def robot_command_input_port(self):
+        return self.get_input_port(self.robot_command_port_index)
+    def desired_effort_output_port(self):
+        return self.get_output_port(self.desired_effort_port_index)

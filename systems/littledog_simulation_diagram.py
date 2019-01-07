@@ -28,33 +28,18 @@ from pydrake.multibody.rigid_body_plant import ContactResults
 from pydrake.all import PySerializer
 
 from lcmt import *
-from robot_coomand_to_rigidbody_converter import RobotCommandToRigidBodyPlantConverter
-from robot_state_encoder import RobotStateEncoder
+from robot_command_to_plant_converter import RobotCommandToRigidBodyPlantLCMConverter
+from robot_state_encoder import RobotStateLCMEncoder
 
 from util.meshcat_rigid_body_visualizer import MeshcatRigidBodyVisualizer
 
 model_path = os.path.join(os.path.dirname(__file__), '../Model/LittleDog.urdf')
 
 
-def LittleDogSimulationDiagram(lcm, dt):
+def LittleDogSimulationDiagram(lcm,rb_tree,  dt, drake_visualizer):
     builder = DiagramBuilder()
 
-    # Build up your Robot World
-    rb_tree = RigidBodyTree()
-    world_frame = RigidBodyFrame("world_frame", rb_tree.world(), [0, 0, 0], [0, 0, 0])
-    AddFlatTerrainToWorld(rb_tree, 1000, 10)
-    robot_frame = RigidBodyFrame("robot_frame", rb_tree.world(), [0, 0, 0.5], [0, 0, 0])
 
-    # insert a robot from urdf files
-    pmap = PackageMap()
-    pmap.PopulateFromFolder(os.path.dirname(model_path))
-    AddModelInstanceFromUrdfStringSearchingInRosPackages(
-            open(model_path, 'r').read(),
-            pmap,
-            os.path.dirname(model_path),
-            FloatingBaseType.kRollPitchYaw,
-            robot_frame,
-            rb_tree)
 
     num_pos = rb_tree.get_num_positions()
 
@@ -68,25 +53,25 @@ def LittleDogSimulationDiagram(lcm, dt):
 
     # Robot command to Plant Converter
     robot_command_to_rigidbodyplant_converter = builder.AddSystem(
-        RobotCommandToRigidBodyPlantConverter(rb_tree.actuators))  # input argu: rigidbody actuators
+        RobotCommandToRigidBodyPlantLCMConverter(rb_tree.actuators))  # input argu: rigidbody actuators
     robot_command_to_rigidbodyplant_converter.set_name('robot_command_to_rigidbodyplant_converter')
 
     # Visualizer
-    visualizer_publisher = builder.AddSystem(DrakeVisualizer(rb_tree, lcm))
+    visualizer_publisher = builder.AddSystem(drake_visualizer)
     visualizer_publisher.set_name('visualizer_publisher')
-    visualizer_publisher.set_publish_period(1e-3)
+    visualizer_publisher.set_publish_period(0.02)
 
     # Visualize
     #visualizer_publisher = builder.AddSystem(MeshcatRigidBodyVisualizer(rb_tree))
 
     # Robot State Encoder
-    robot_state_encoder = builder.AddSystem(RobotStateEncoder(rb_tree))  # force_sensor_info
+    robot_state_encoder = builder.AddSystem(RobotStateLCMEncoder(rb_tree))  # force_sensor_info
     robot_state_encoder.set_name('robot_state_encoder')
 
     # Robot State Publisher
     robot_state_publisher = builder.AddSystem(LcmPublisherSystem.Make('EST_ROBOT_STATE', robot_state_t, lcm))
     robot_state_publisher.set_name('robot_state_publisher')
-    robot_state_publisher.set_publish_period(1e-3)
+    robot_state_publisher.set_publish_period(0.005)
 
 
 
@@ -110,6 +95,6 @@ def LittleDogSimulationDiagram(lcm, dt):
     builder.Connect(plant.state_output_port(), logger.get_input_port(0))
 
 
-    return builder.Build(), logger
+    return builder.Build(), logger,plant
 
 

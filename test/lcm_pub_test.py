@@ -101,6 +101,8 @@ diagram = builder.Build()
 
 # simulation setting
 diagram_context = diagram.CreateDefaultContext()
+
+
 simulator = Simulator(diagram, diagram_context)
 simulator.set_publish_every_time_step(False)
 simulator.set_target_realtime_rate(1)
@@ -109,22 +111,9 @@ simulator.Initialize()
 simulation_time = 10
 
 lcm.StartReceiveThread()
-simulator.StepTo(simulation_time)
+simulator.StepTo(100)
 lcm.StopReceiveThread()
 
 
-#
-# context = dut.CreateDefaultContext()
-# message = robot_state_t()
-# message.timestamp = context.get_time() * 1e3
-# message.num_joints = 5
-# message.joint_position = np.ones(5)
-# message.joint_velocity = np.ones(5)*0.2
-#
-# context.FixInputPort(0, AbstractValue.Make(message))
-#
-# while True:
-#     message.timestamp = context.get_time() * 1e3
-#     print(message.timestamp)
-#     dut.Publish(context)
+
 

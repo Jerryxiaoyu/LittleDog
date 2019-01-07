@@ -42,7 +42,11 @@ def joints_PID_params(rbtree):
     assert kp.shape[0] == num_joints
 
     return kp, ki, kd
+
 class RobotPDAndFeedForwardController(LeafSystem):
+    """
+
+    """
 
     def __init__(self,  rbtree, kp, ki, kd):
         LeafSystem.__init__(self)
@@ -56,10 +60,8 @@ class RobotPDAndFeedForwardController(LeafSystem):
         self.robot_state_port_index = self._DeclareAbstractInputPort('robot_state_port',
                                                                      AbstractValue.Make(
                                                                          littledog_command_t)).get_index()
-
         self.state_ref_port_index = self._DeclareInputPort('State_Ref_Port', PortDataType.kVectorValued,
                                                            self.num_controlled_q_ *2).get_index()
-
         self.robot_command_port_index = self._DeclareAbstractOutputPort('robot_command_port',
                                                                         self._Allocator,
                                                                         self._OutputCommand,
@@ -72,6 +74,7 @@ class RobotPDAndFeedForwardController(LeafSystem):
         ## OutputDesiredEffort is not equal to output command
         msg = self.EvalAbstractInput(context, self.robot_state_port_index).get_value()
 
+        print(msg.num_joints)
         q = np.array(msg.joint_position)
         qv = np.array(msg.joint_velocity)
 
@@ -81,10 +84,8 @@ class RobotPDAndFeedForwardController(LeafSystem):
             command_msg.num_joints = self.num_controlled_q_
 
             state_d = self.EvalVectorInput(context, self.state_ref_port_index).get_value()
-
             controlled_state_diff = state_d - np.concatenate((q, qv), axis=0)
             state_block = context.get_continuous_state_vector().get_value()
-
 
             command_msg.joint_command = self.kp * (controlled_state_diff[:self.num_controlled_q_]) + self.kd * (
             controlled_state_diff[self.num_controlled_q_:]) + self.ki * (state_block)
@@ -137,7 +138,6 @@ kp,ki,kd = joints_PID_params(rb_tree)
 controller = builder.AddSystem(RobotPDAndFeedForwardController(rb_tree,kp,ki,kd))
 
 
-
 builder.Connect(robot_state_subscriber.get_output_port(0),
                controller.robot_state_input_port())
 builder.Connect(controller.robot_command_output_port(),
@@ -150,8 +150,10 @@ controller_context = diagram.GetMutableSubsystemContext(controller, diagram_cont
 
 controller_context.FixInputPort(
     controller.state_ref_port_index, np.zeros(controller.num_controlled_q_*2))
+#
 
 simulator = Simulator(diagram, diagram_context)
 simulator.set_publish_every_time_step(False)
+simulator.set_target_realtime_rate(1)
+simulator.Initialize()
 simulator.StepTo(10)
-

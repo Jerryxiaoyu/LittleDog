@@ -1,5 +1,5 @@
 <?xml version="1.0" ?>
-
+ <!-- 修改了 capsule -->
 <robot name="LittleDog" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
  xsi:schemaLocation="http://drake.mit.edu drake-distro/drake/doc/drakeURDF.xsd"
  xmlns="http://drake.mit.edu">
@@ -19,13 +19,6 @@
       	<color rgba="0.1 0.1 0.1 1" />
       </material>
     </visual>
-
-    <collision>
-      <geometry>
-        <mesh filename="meshes/body.obj" scale=".0254 .0254 .0254" />
-      </geometry>
-       
-    </collision>
   </link>
 
   <link name="front_left_hip">
@@ -95,14 +88,15 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
-        <mesh filename="meshes/front_left_lower.obj" scale="0.0254 0.0254 0.0254"/>
+         <mesh filename="meshes/front_left_lower.obj" scale="0.0254 0.0254 0.0254"/> 
+	 
       </geometry>
       <material name="black" />
     </visual>
     <collision group="left_lower_legs">
       <origin xyz="-0.0265 0 -0.048" /> <!-- note this is approximate -->
       <geometry>
-        <capsule radius="0.012" length="0.09" />
+        <cylinder  radius="0.012" length="0.09" />
       </geometry>
     </collision>
     <collision group="feet">
@@ -202,7 +196,7 @@
     <collision group="right_lower_legs">
       <origin xyz="-0.0265 0 -0.048" /> <!-- note this is approximate -->
       <geometry>
-        <capsule radius="0.012" length="0.09" />
+        <cylinder  radius="0.012" length="0.09" />
       </geometry>
     </collision>
     <collision group="feet">
@@ -301,7 +295,7 @@
     <collision group="left_lower_legs">
       <origin xyz="0.0265 0 -0.048" /> <!-- note this is approximate -->
       <geometry>
-        <capsule radius="0.012" length="0.09" />
+        <cylinder  radius="0.012" length="0.09" />
       </geometry>
     </collision>
     <collision group="feet">
@@ -400,7 +394,7 @@
     <collision group="right_lower_legs">
       <origin xyz="0.0265 0 -0.048" /> <!-- note this is approximate -->
       <geometry>
-        <capsule radius="0.012" length="0.09" />
+        <cylinder  radius="0.012" length="0.09" />
       </geometry>
     </collision>
     <collision group="feet">

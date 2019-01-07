@@ -60,7 +60,7 @@ AddModelInstanceFromUrdfStringSearchingInRosPackages(
 def joints_PID_params(rbtree):
     num_joints = rb_tree.get_num_actuators()
 
-    kp = np.ones(num_joints) * 100
+    kp = np.ones(num_joints) * 1
     ki = np.zeros(num_joints)
     kd = 2 * np.sqrt(kp)
 
@@ -84,8 +84,8 @@ class RobotPDAndFeedForwardController(LeafSystem):
                                                                      AbstractValue.Make(
                                                                          robot_state_t)).get_index()
 
-        self.state_ref_port_index = self._DeclareInputPort('State_Ref_Port', PortDataType.kVectorValued,
-                                                           self.num_controlled_q_ * 2).get_index()
+        # self.state_ref_port_index = self._DeclareInputPort('State_Ref_Port', PortDataType.kVectorValued,
+        #                                                    self.num_controlled_q_ * 2).get_index()
 
         self.robot_command_port_index = self._DeclareAbstractOutputPort('robot_command_port',
                                                                         self._Allocator,
@@ -98,32 +98,28 @@ class RobotPDAndFeedForwardController(LeafSystem):
         ## OutputDesiredEffort is not equal to output command
         msg = self.EvalAbstractInput(context, self.robot_state_port_index).get_value()
 
-        print('t = {}  joint_pos = {}'.format(msg.timestamp, msg.joint_position))
+        #print('t = {}  joint_pos = {}'.format(msg.timestamp, msg.joint_position))
 
         command_msg = littledog_command_t()
         command_msg.timestamp = context.get_time() * 1e3  # milliseconds
         command_msg.num_joints = self.num_controlled_q_
-
-
+        command_msg.joint_command = np.zeros(self.num_controlled_q_)
         if msg.num_joints == self.num_controlled_q_:
             q = np.array(msg.joint_position)
             qv = np.array(msg.joint_velocity)
-            print(msg.num_joints)
+            print('t = {}  joint_pos = {}'.format(msg.timestamp, msg.joint_position))
 
-            state_d = self.EvalVectorInput(context, self.state_ref_port_index).get_value()
+            #state_d = self.EvalVectorInput(context, self.state_ref_port_index).get_value()
 
+            state_d = np.zeros(self.num_controlled_q_ * 2)
             controlled_state_diff = state_d - np.concatenate((q, qv), axis=0)
             #state_block = context.get_continuous_state_vector().get_value()
 
            # print(state_block)
-            command_msg.joint_command = self.kp * (controlled_state_diff[:self.num_controlled_q_]) + self.kd * (
-            controlled_state_diff[self.num_controlled_q_:]) #+ self.ki * (state_block)
-
-
+            command_msg.joint_command = self.kp * (controlled_state_diff[:self.num_controlled_q_]) + self.kd * (controlled_state_diff[self.num_controlled_q_:]) #+ self.ki * (state_block)
         else:
             command_msg.joint_command = np.zeros(self.num_controlled_q_)
         output.set_value(command_msg)
-
 
     # Port Declaration
     def robot_state_input_port(self):
@@ -145,8 +141,9 @@ robot_command_publisher.set_name('robot_command_publisher')
 robot_command_publisher.set_publish_period(1e-3)
 
 
+# controller
 kp,ki,kd = joints_PID_params(rb_tree)
-controller = builder.AddSystem(RobotPDAndFeedForwardController(rb_tree,kp,ki,kd))
+controller = builder.AddSystem(RobotPDAndFeedForwardController(rb_tree, kp, ki,  kd))
 
 builder.Connect(robot_state_subscriber.get_output_port(0),
                controller.robot_state_input_port())
@@ -155,29 +152,30 @@ builder.Connect(controller.robot_command_output_port(),
 
 
 diagram = builder.Build()
-
 diagram_context = diagram.CreateDefaultContext()
 
 
-controller_context = diagram.GetMutableSubsystemContext(controller, diagram_context)
-controller_context.FixInputPort(
-    controller.state_ref_port_index, np.zeros(controller.num_controlled_q_*2))
+# controller_context = diagram.GetMutableSubsystemContext(controller, diagram_context)
+# controller_context.FixInputPort(
+#     controller.state_ref_port_index, np.zeros(controller.num_controlled_q_*2))
 
 #simulation setting
-simulator = Simulator(diagram, diagram_context)
-simulator.set_publish_every_time_step(False)
-simulator.set_target_realtime_rate(1)
-simulator.Initialize()
+# simulator = Simulator(diagram, diagram_context)
+# simulator.set_publish_every_time_step(False)
+# simulator.set_target_realtime_rate(1)
+# simulator.Initialize()
+#
+# simulation_time = 10
+#
+# lcm.StartReceiveThread()
+# simulator.StepTo(simulation_time)
+# lcm.StopReceiveThread()
 
 
-simulation_time = 10
+from pydrake.systems.lcm import LcmDrivenLoop
+from pydrake.systems.lcm import UtimeMessageToSeconds
+
+a = UtimeMessageToSeconds()
+loop = LcmDrivenLoop(diagram, robot_state_subscriber, None,  lcm,  a )
 
 
-
-lcm.StartReceiveThread()
-simulator.StepTo(simulation_time)
-lcm.StopReceiveThread()
-
-# while(True):
-#     pub_context = diagram.GetMutableSubsystemContext(robot_command_publisher, diagram_context)
-#     robot_command_publisher.Publish(pub_context)
